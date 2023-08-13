@@ -1,5 +1,6 @@
 /*mqttToMorse*/
 /* Converts an MQTT message to morse code. */
+/* author: David E. Powell */
 
 #include <Arduino.h>
 #include <PubSubClient.h>
@@ -21,6 +22,28 @@ const char* morse_text_table[] = {
 const char* morse_number_table[] = {
   "-----",".----", "..---", "...--", "....-", ".....","-....","--...","---..","----."
 };
+const char* morse_special_table[] = {
+".-.-.-", //Period          
+"--..--", //Comma           
+"..--..", //Question Mark    
+"-.-.-.", //Semicolon       
+"---...", //Colon           
+"-....-", //Dash            
+"-..-." , //Slash           
+".----.", //Apostrophe      
+".-..-.", //Quotations      
+"..--.-", //Underscore      
+".-.-." , //Addition        
+"-..-" ,  //Multiplication  
+"-...-" , //Equal           
+"-.--.-", //Right Parenthesis
+"-.--."   //Left Parenthesis   
+};
+
+const char morse_special_lookup[] = {
+  '.', ',', '?', ';', ':', '-', '/', '\'', '"', '_', '+', '*', '=', ')', '('
+};
+int special_lookup_size=sizeof(morse_special_lookup)/sizeof(morse_special_lookup[0]);
 
 // Set up the ESP8266 and MQTT client
 WiFiClient espClient;
@@ -365,6 +388,20 @@ void loadSettings()
     }
   }
 
+int getSpecialCharIndex(char c)
+  {
+  int index=-1;
+  for (int i=0; i<special_lookup_size; i++)
+    {
+    if (c==morse_special_lookup[i])
+      {
+      index=i;
+      break;
+      }
+    }
+  return index;
+  }
+
 void playMorse(const char* morse_code) {
   for (int j = 0; j < strlen(morse_code); j++) {
     if (morse_code[j] == '.') 
@@ -390,31 +427,45 @@ void playMorse(const char* morse_code) {
 
 // Define the Morse code conversion function
 void convert_to_morse(String message) {
-  for (int i = 0; i < message.length(); i++) {
+  for (int i = 0; i < message.length(); i++) 
+    {
     char c = message.charAt(i);
     Serial.print(c);
     if (c == ' ') 
       {
       delay(settings.dotLength*7); // Pause between words
       }
-    else if (c >= '0' || c <= '9') { //numbers
+    else if (c >= '0' && c <= '9') //numbers
+      { 
       int index = toupper(c) - '0';
-      if (index >= 0 && index < 9) {
-      const char* morse_code = morse_number_table[index];
-      playMorse(morse_code);   
-    } else 
+      if (index >= 0 && index < 9) 
+        {
+        const char* morse_code = morse_number_table[index];
+        playMorse(morse_code);   
+        }
+      }
+    else if (toupper(c)>='A' && toupper(c)<='Z')
       {
       int index = toupper(c) - 'A';
-      if (index >= 0 && index < 26) {
+      if (index >= 0 && index < 26) 
+        {
         const char* morse_code = morse_text_table[index];
         playMorse(morse_code);
         }
       }
+    else //might be punctuation or other character
+      {
+      int index=getSpecialCharIndex(c);
+      if (index > -1)
+        {
+        const char* morse_code = morse_special_table[index];
+        playMorse(morse_code);   
+        }
+      }
+    client.loop(); //stay connected to broker
     }
-  client.loop(); //stay connected to broker
+  Serial.println("");
   }
-Serial.println("");
-}
 
 // Define the MQTT callback function
 void callback(char* topic, byte* payload, unsigned int length) 
@@ -560,20 +611,20 @@ void initConnections()
   }
 
 void loop() 
-{
-checkForCommand(); // Check for input in case something needs to be changed to work
-
-if (settingsAreValid)
   {
-  if (WiFi.status() != WL_CONNECTED)
-    {
-    initConnections();
-    }
+  checkForCommand(); // Check for input in case something needs to be changed to work
 
-  client.loop();
-  //myDelay(50);
+  if (settingsAreValid)
+    {
+    if (WiFi.status() != WL_CONNECTED)
+      {
+      initConnections();
+      }
+
+    client.loop();
+    //myDelay(50);
+    }
   }
-}
 
 /*
   SerialEvent occurs whenever a new data comes in the hardware serial RX. This
