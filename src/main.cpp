@@ -7,8 +7,6 @@
 #include "mqttToMorse.h"
 #include <EEPROM.h>
 
-#define TONE_PIN 4 //D2 is GPIO4
-
 // Define the MQTT broker and topic
 // const char* mqtt_server = "10.10.6.15";
 // const char* mqtt_topic = "morse_code";
