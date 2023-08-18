@@ -81,50 +81,55 @@ void myDelay(unsigned long dly)
   delay(dly);
   }
 
-void showSettings()
+void showSettings(char* buffer)
   {
-  Serial.print("ssid=<wifi ssid> (");
-  Serial.print(settings.ssid);
-  Serial.println(")");
-  Serial.print("wifipass=<wifi password> (");
-  Serial.print(settings.wifiPassword);
-  Serial.println(")");
-  Serial.print("broker=<address of MQTT broker> (");
-  Serial.print(settings.brokerAddress);
-  Serial.println(")");
-  Serial.print("brokerPort=<port number MQTT broker> (");
-  Serial.print(settings.brokerPort);
-  Serial.println(")");
-  Serial.print("userName=<user ID for MQTT broker> (");
-  Serial.print(settings.mqttUsername);
-  Serial.println(")");
-  Serial.print("userPass=<user password for MQTT broker> (");
-  Serial.print(settings.mqttUserPassword);
-  Serial.println(")");
-  Serial.print("topic1=<MQTT topic for which to subscribe> (");
-  Serial.print(settings.mqttTopic);
-  Serial.println(")");
-  Serial.print("lwtMessage=<status message to send when power is removed> (");
-  Serial.print(settings.mqttLWTMessage);
-  Serial.println(")");
-  Serial.print("mqttCommandTopic=<mqtt message for commands to this device> (");
-  Serial.print(settings.mqttCommandTopic);
-  Serial.println(")");
-  Serial.print("debug=<print debug messages to serial port> (");
-  Serial.print(settings.debug?"true":"false");
-  Serial.println(")");
-  Serial.print("pitch=<frequency in Hz for tone pitch> (");
-  Serial.print(settings.pitch);
-  Serial.println(")");
-  Serial.print("dotLength=<number of milliseconds for dot> (");
-  Serial.print(settings.dotLength);
-  Serial.println(")");
-  Serial.print("MQTT client ID=<automatically generated client ID> (");
-  Serial.print(settings.mqttClientId);
-  Serial.println(") **Use \"resetmqttid=yes\" to regenerate");
-  Serial.println("\n*** Use \"factorydefaults=yes\" to reset all settings ***");
-  Serial.print("\nIP Address=");
-  Serial.println(WiFi.localIP());
+  char str[8];
+  strcpy(buffer,"ssid=<wifi ssid> (");
+  strcat(buffer,settings.ssid);
+  strcat(buffer,")\n");
+  strcat(buffer,"wifipass=<wifi password> (");
+  strcat(buffer,settings.wifiPassword);
+  strcat(buffer,")\n");
+  strcat(buffer,"broker=<address of MQTT broker> (");
+  strcat(buffer,settings.brokerAddress);
+  strcat(buffer,")\n");
+  strcat(buffer,"brokerPort=<port number MQTT broker> (");
+  itoa(settings.brokerPort,str,10);
+  strcat(buffer,str);
+  strcat(buffer,")\n");
+  strcat(buffer,"userName=<user ID for MQTT broker> (");
+  strcat(buffer,settings.mqttUsername);
+  strcat(buffer,")\n");
+  strcat(buffer,"userPass=<user password for MQTT broker> (");
+  strcat(buffer,settings.mqttUserPassword);
+  strcat(buffer,")\n");
+  strcat(buffer,"topic1=<MQTT topic for which to subscribe> (");
+  strcat(buffer,settings.mqttTopic);
+  strcat(buffer,")\n");
+  strcat(buffer,"lwtMessage=<status message to send when power is removed> (");
+  strcat(buffer,settings.mqttLWTMessage);
+  strcat(buffer,")\n");
+  strcat(buffer,"mqttCommandTopic=<mqtt message for commands to this device> (");
+  strcat(buffer,settings.mqttCommandTopic);
+  strcat(buffer,")\n");
+  strcat(buffer,"debug=<print debug messages to serial port> (");
+  strcat(buffer,settings.debug?"true":"false");
+  strcat(buffer,")\n");
+  strcat(buffer,"pitch=<frequency in Hz for tone pitch> (");
+  itoa(settings.pitch,str,10);
+  strcat(buffer,str);
+  strcat(buffer,")\n");
+  strcat(buffer,"dotLength=<number of milliseconds for dot> (");
+  itoa(settings.dotLength,str,10);
+  strcat(buffer,str);
+  strcat(buffer,")\n");
+  strcat(buffer,"MQTT client ID=<automatically generated client ID> (");
+  strcat(buffer,settings.mqttClientId);
+  strcat(buffer,") **Use \"resetmqttid=yes\" to regenerate\n");
+  strcat(buffer,"\n*** Use \"factorydefaults=yes\" to reset all settings ***\n");
+  strcat(buffer,"\nIP Address=");
+  strcat(buffer,WiFi.localIP().toString().c_str());
+  strcat(buffer,"\n");
   }
 /*
  * Check for configuration input via the serial port.  Return a null string 
@@ -272,7 +277,9 @@ void processCommand(String cmd)
 
   if (nme==NULL || val==NULL || strlen(nme)==0) //empty string is a valid val value
     {
-    showSettings();
+    char buffer[SETTINGS_BUFFER_SIZE];
+    showSettings(buffer);
+    Serial.print(buffer);
     return;   //not a valid command, or it's missing
     }
   else if (strcmp(nme,"ssid")==0)
@@ -363,7 +370,9 @@ void processCommand(String cmd)
     }
   else
     {
-    showSettings();
+    char buffer[SETTINGS_BUFFER_SIZE];
+    showSettings(buffer);
+    Serial.print(buffer);
     }
   return;
   }
@@ -467,6 +476,51 @@ void convert_to_morse(String message) {
   Serial.println("");
   }
 
+/* print and publish a message to a topic */
+boolean publish(char* topic, const char* reading, boolean retain)
+  {
+  Serial.print(topic);
+  Serial.print(" ");
+  Serial.println(reading);
+  return client.publish(topic,reading,retain); 
+  }
+
+/* Send a message to the broker */
+boolean sendMessage(char* topic, char* value)
+  { 
+  boolean success=false;
+  if (!client.connected())
+    {
+    Serial.println("Not connected to MQTT broker!");
+    }
+  else
+    {
+    char topicBuf[MQTT_MAX_TOPIC_SIZE+MQTT_MAX_MESSAGE_SIZE];
+    char reading[18];
+//    boolean success=false; //only for the incoming topic and value
+
+    //publish the radio strength reading while we're at it
+    strcpy(topicBuf,settings.mqttTopic);
+    strcat(topicBuf,"/");
+    strcat(topicBuf,MQTT_TOPIC_RSSI);
+    sprintf(reading,"%d",WiFi.RSSI()); 
+    success=publish(topicBuf,reading,true); //retain
+    if (!success)
+      Serial.println("************ Failed publishing rssi!");
+    
+    //publish the message
+    strcpy(topicBuf,settings.mqttTopic);
+    strcat(topicBuf,"/");
+    strcat(topicBuf,topic);
+    success=publish(topicBuf,value,true); //retain
+    if (!success)
+      Serial.println("************ Failed publishing "+String(topic)+"! ("+String(success)+")");
+    }
+  return success;
+  }
+
+
+
 // Define the MQTT callback function
 void callback(char* topic, byte* payload, unsigned int length) 
   {
@@ -491,7 +545,14 @@ void callback(char* topic, byte* payload, unsigned int length)
     }
   else if (strcmp(topic,settings.mqttCommandTopic)==0)
     {
-    processCommand(message);
+    if (message.equals(MQTT_TOPIC_SETTINGS))
+      {
+      char buffer[SETTINGS_BUFFER_SIZE];
+      showSettings(buffer);
+      sendMessage(MQTT_TOPIC_SETTINGS,buffer);
+      }
+    else
+      processCommand(message);
     }
   }
 
@@ -517,7 +578,9 @@ bool initInternals()
   else
     Serial.println("passed.");
   
-  showSettings();
+  char buffer[SETTINGS_BUFFER_SIZE];
+  showSettings(buffer);
+  Serial.print(buffer);
   return settingsAreValid;
   }
 
@@ -571,6 +634,7 @@ void initConnections()
 
     if (WiFi.status() == WL_CONNECTED) //connect to mqtt broker
       {
+      client.setBufferSize(SETTINGS_BUFFER_SIZE); //default (256) isn't big enough
       client.setServer(settings.brokerAddress, settings.brokerPort);
       client.setCallback(callback);
       while(!client.connected())

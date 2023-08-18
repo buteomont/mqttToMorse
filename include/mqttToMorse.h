@@ -12,11 +12,12 @@
 #define DEFAULT_MQTT_BROKER_PORT 1883
 #define MQTT_MAX_TOPIC_SIZE 100
 #define MQTT_MAX_MESSAGE_SIZE 15
-#define HISTORY_BUFFER_SIZE 100
+#define SETTINGS_BUFFER_SIZE 1000
 #define DEFAULT_MQTT_TOPIC "morse_code"
 #define MQTT_CLIENT_ID_ROOT "morseCode"
 #define MQTT_TOPIC_RSSI "rssi"
 #define MQTT_TOPIC_STATUS "status"
+#define MQTT_TOPIC_SETTINGS "settings"
 #define DEFAULT_MQTT_LWT_MESSAGE "disconnected"
 #define DEFAULT_MQTT_COMMAND_TOPIC "morse_code/command"
 
